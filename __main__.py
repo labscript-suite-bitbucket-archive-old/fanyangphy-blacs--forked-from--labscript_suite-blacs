@@ -587,7 +587,7 @@ class BLACS(object):
 
     def finalise_quit(self,initial_time):
         logger.info('finalise_quit called')
-        tab_close_timeout = 2
+        tab_close_timeout = 5
         # Kill any tabs which didn't close themselves:
         for name, tab in list(self.tablist.items()):
             if tab.destroy_complete:
@@ -596,6 +596,7 @@ class BLACS(object):
             for name, tab in list(self.tablist.items()):
                 # If a tab has a fatal error or is taking too long to close, force close it:
                 if (time.time() - initial_time > tab_close_timeout) or tab.state == 'fatal error':
+                    logger.info('force closing')
                     try:
                         tab.close_tab()
                     except Exception as e:
