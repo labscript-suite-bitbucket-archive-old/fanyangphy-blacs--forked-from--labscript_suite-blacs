@@ -265,7 +265,13 @@ class Tab(object):
         self._changed_layout = self._ui.changed_layout
         self._changed_widget.hide()        
         self.BLACS_connection = self.settings['connection_table'].find_by_name(self.device_name).BLACS_connection
-        self._ui.device_name.setText("<b>%s</b> [conn: %s]"%(str(self.device_name),str(self.BLACS_connection)))
+        self.remote_device = self.settings['connection_table'].find_by_name(self.device_name).properties.get('remote_device')
+        if self.remote_device is not None:
+            self._ui.device_name.setText("<b>%s</b> [remote: %s:%s,%s; conn: %s]" % 
+                                         (str(self.device_name),str(self.remote_device['host']),str(self.remote_device['port']),
+                                          str(self.remote_device['proxy_port']), str(self.BLACS_connection)))
+        else:
+            self._ui.device_name.setText("<b>%s</b> [conn: %s]" % (str(self.device_name), str(self.BLACS_connection)))
         elide_label(self._ui.device_name, self._ui.horizontalLayout, Qt.ElideRight)
         elide_label(self._ui.state_label, self._ui.state_label_layout, Qt.ElideRight)
 
@@ -453,7 +459,7 @@ class Tab(object):
             # not in a worker process named GUI
             raise Exception('You cannot call a worker process "GUI". Why would you want to? Your worker process cannot interact with the BLACS GUI directly, so you are just trying to confuse yourself!')
         
-        worker = WorkerClass(output_redirection_port=self._output_box.port)
+        worker = WorkerClass(output_redirection_port=self._output_box.port, remote_process_client=self.remote_process_client)
         to_worker, from_worker = worker.start(name, self.device_name, workerargs)
         self.workers[name] = (worker,to_worker,from_worker)
         self.event_queue.put(MODE_MANUAL|MODE_BUFFERED|MODE_TRANSITION_TO_BUFFERED|MODE_TRANSITION_TO_MANUAL,True,False,[Tab._initialise_worker,[(name,),{}]],prepend=True)
@@ -553,6 +559,10 @@ class Tab(object):
             if self._mainloop_thread.is_alive():
                 worker_data[2].put((False,'quit',None))
                 self.event_queue.put(MODE_MANUAL|MODE_BUFFERED|MODE_TRANSITION_TO_BUFFERED|MODE_TRANSITION_TO_MANUAL,True,False,['_quit',None],prepend=True)
+        # terminate the remote process client thread
+        if hasattr(self, 'remote_process_client') and self.remote_process_client is not None:
+            self.remote_process_client.destroy()
+            del self.remote_process_client
         self.notebook = self._ui.parentWidget().parentWidget()
         currentpage = None
         if self.notebook:

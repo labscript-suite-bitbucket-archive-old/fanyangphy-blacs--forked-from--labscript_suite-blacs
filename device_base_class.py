@@ -33,11 +33,20 @@ from blacs.tab_base_classes import MODE_MANUAL, MODE_TRANSITION_TO_BUFFERED, MOD
 from blacs.output_classes import AO, DO, DDS
 from labscript_utils.qtwidgets.toolpalette import ToolPaletteGroup
 
+from zprocess import RemoteProcessClient
+
 
 class DeviceTab(Tab):
     def __init__(self,notebook,settings,restart=False):
         Tab.__init__(self,notebook,settings,restart)
         self.connection_table = settings['connection_table']
+        
+        # set up remote process client
+        remote_device = self.connection_table.find_by_name(self.device_name).properties.get('remote_device')
+        if remote_device is not None:
+            self.remote_process_client = RemoteProcessClient(host=remote_device['host'], port=remote_device['port'], proxy_port=remote_device['proxy_port'], allow_insecure=True)
+        else:
+            self.remote_process_client = None
         
         # Create the variables we need
         self._AO = {}
@@ -51,7 +60,7 @@ class DeviceTab(Tab):
         self._secondary_workers = []
         self._can_check_remote_values = False
         self._changed_radio_buttons = {}
-        self.destroy_complete = False
+        # self.destroy_complete = False
         
         # Call the initialise GUI function
         self.initialise_GUI() 
@@ -351,7 +360,11 @@ class DeviceTab(Tab):
         for worker in self._secondary_workers:
             yield(self.queue_work(worker,'shutdown'))
         self.close_tab()
-        self.destroy_complete = True
+        # self.destroy_complete = True
+        
+    @property
+    def destroy_complete(self):
+        return not self._mainloop_thread.is_alive()
     
     # Only allow this to be called when we are in MODE_MANUAL and keep it queued up if we are not
     # When pulling out the state from the state queue, we check to see if there is an adjacent state that is more recent, and use that one
